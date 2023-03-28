@@ -1,0 +1,30 @@
+{
+  "name": "@gas0324/mysql",
+  "version": "1.0.0",
+  "description": "mysql生成器",
+  "main": "dist/index",
+  "scripts": {
+    "prebuild": "rmdir /Q /S dist",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepush": "npm run build",
+    "push": "npm publish --access public"
+  },
+  "keywords": [
+    "mysql",
+    "mysql生成器",
+    "asMysql",
+    "as-mysql"
+  ],
+  "author": "Asd",
+  "license": "MIT",
+  "dependencies": {
+    "@gas0324/utils": "^1.0.0",
+    "mysql2": "^3.2.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.5",
+    "@types/node": "^18.15.5"
+  },
+  "files": ["dist/*"]
+}
