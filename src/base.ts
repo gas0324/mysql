@@ -1,14 +1,12 @@
-import { MysqlOpt, WhereObjectOption, AnyObject } from "./type";
-import { typeOf, humpToUnline } from '@gas0324/utils';
-import { toSqlValue, sqlJoin } from './util';
-import { MysqlError } from "./mysql-error";
+import { MysqlOpt, WhereObjectOption, AnyObject, WhereOptions } from "./type";
+import { typeOf, humpToUnline, isEmpty } from '@gas0324/util';
 
 export class Base{
 
   protected opt: Partial<MysqlOpt> = {
     field: '*',
     data: {},
-  };
+  }
 
   constructor(table?: string) {
     this.opt.table = table;
@@ -60,7 +58,7 @@ export class Base{
    * where条件
    * @param {string | Array<WhereObjectOption | string> | WhereObjectOption} where 条件
    */
-  where(where: string | Array<WhereObjectOption | string> | WhereObjectOption) {
+  where(where: WhereOptions) {
     this.opt.where = where;
     return this;
   }
@@ -100,70 +98,99 @@ export class Base{
 
   /**
    * 获取where
-   * @param {string | Array<WhereObjectOption | string> | WhereObjectOption} where [description]
+   * @param {WhereOptions} where [description]
    */
-  getWhere(where: string | Array<WhereObjectOption | string> | WhereObjectOption = this.opt.where) {
-    const type = typeOf(where);
-    let whereStr = '', params: string[] = [];
+  getWhere(where: WhereOptions = this.opt.where) {
 
-    function _setWhere(where: WhereObjectOption){
+    let andArr: string[] = [], params: any[] = [];
 
-      const { _mode: mode = 'base', ...otherWhere } = where;
+    (function _setWhere(where: WhereOptions){
+      const type = typeOf(where);
+      if(type == 'string') {
+        andArr.push(where as string);
+      } else if(type == 'object') {
+        const { _mode: mode = 'base', ...otherWhere } = where as WhereObjectOption;
 
-      let keys = Object.keys(otherWhere);
-      if (keys.length){
-        // 基础模式：{xxx:xxx} xxx = xxx
-        if(mode == 'base'){
-          whereStr += keys.map(key => {
-            params.push(toSqlValue(otherWhere[key]));
-            return `${humpToUnline(key)} = ?`
-          })
-          .join(' and ');
-        }else{
-          //正常模式 {name: 'xxx', value: 'xxx', operator: 'in'} 转换为 xxx in (xxx)
-          otherWhere.name = humpToUnline(otherWhere.name);
-          if(!otherWhere.value){
-            throw new MysqlError(`value不存在，where: ${JSON.stringify(where)}`, '106');
-          };
-          switch (otherWhere.operator) {
-            case 'like':
-              whereStr += ` and ${otherWhere.name} like '%?%'`;
-              params.push(`%${otherWhere.value}%`);
-              break;
-            case 'in':
-              whereStr += ` and ${otherWhere.name} in (${otherWhere.value.map( (_: any) => '?').join()})`;
-              params = params.concat(otherWhere.value);
-              otherWhere.value.map(val => toSqlValue(val))
-              break;
-            default:
-              whereStr += ` and ${otherWhere.name} = ?`;
-              params.push(toSqlValue(otherWhere.value));
-              break;
+        let keys = Object.keys(otherWhere);
+        if (keys.length){
+          // 基础模式：{xxx:xxx} xxx = xxx
+          if(mode == 'base'){
+            keys.forEach(key => {
+              if(isEmpty(otherWhere[key])){
+                return;
+              }
+              andArr.push(`${humpToUnline(key)} = ?`);
+              params.push(otherWhere[key]);
+            });
+          }else{
+            //正常模式 {name: 'xxx', value: 'xxx', operator: 'in'} 转换为 xxx in (xxx)
+            if(isEmpty(otherWhere.value)){
+              return;
+            }
+            if(typeOf(otherWhere.name) == 'array'){
+              let _orArr: string[] = [], _orParams: any[] = [];
+              (<string[]>otherWhere.name).forEach( name => {
+                const { where: _whereStr, params: _params} = _getNormalWhere({
+                  name: name,
+                  operator: otherWhere.operator,
+                  value: otherWhere.value
+                });
+                _orArr.push(_whereStr);
+                _orParams.push(..._params);
+              })
+              andArr.push(`(${_orArr.join(' or ')})`);
+              params.push(..._orParams);
+            }else{
+              const { where: _whereStr, params: _params} = _getNormalWhere({
+                name: otherWhere.name as string,
+                operator: otherWhere.operator,
+                value: otherWhere.value
+              });
+              andArr.push(_whereStr);
+              params.push(..._params);
+            }
           }
         }
+      } else if(type == 'array') {
+        (where as Array<WhereOptions>).map(subwhere => {
+          _setWhere(subwhere as WhereObjectOption);
+        })
       }
+    })(where);
+
+    function _getNormalWhere({name, value, operator}: {name: string, value: any, operator: string}){
+      name = humpToUnline(name);
+      let where: string, params: any[];
+      switch (operator) {
+        case 'like':
+          where = `${name} like ?`;
+          params = [`%${value}%`];
+          break;
+        case 'in':
+          where = `${name} in (${value.map( _ => '?').join()})`;
+          params = value;
+          break;
+        default:
+          where = `${name} = ?`;
+          params = [value];
+          break;
+      }
+      return {
+        where,
+        params
+      };
     }
 
-    if(type == 'string') {
-      whereStr += `where ${where}`;
-    } else if(type == 'object') {
-      whereStr = 'where ';
-      _setWhere(where as WhereObjectOption);
-    } else if(type == 'array') {
-      (where as Array<WhereObjectOption | string>).map(subwhere => {
-        whereStr += 'where 1=1';
-        if(typeOf(subwhere) == 'string'){
-          whereStr += `and ${subwhere}`;
-        }else{
-          _setWhere(subwhere as WhereObjectOption);
-        }
-      })
+    let whereStr = '';
+
+    if(andArr.length){
+      whereStr = 'where ' + andArr.join(' and ');
     }
 
     return {
       whereStr,
       params
-    };
+    }
   }
 
 
@@ -183,14 +210,16 @@ export class Base{
       case 'insert':
         keys = Object.keys(data);
         let values = keys.map(key => data[key]);
-        sql = `insert into ${table} (${keys.map(key => `\`${humpToUnline(key)}\``).join(',')}) values (${sqlJoin(values)})`;
+        sql = `insert into ${table} (${keys.map(key => `\`${humpToUnline(key)}\``).join(',')}) values (${keys.map(_ => '?').join()})`;
+        params = params.concat(values);
         break;
       case 'delete':
         sql = `delete from ${table} ${whereStr}`;
         break;
       case 'update':
         keys = Object.keys(data);
-        sql = `update ${table} set ${keys.map(key => `\`${humpToUnline(key)}\` = ${toSqlValue(data[key])}`)} ${whereStr}`;
+        sql = `update ${table} set ${keys.map(key => `\`${humpToUnline(key)}\` = ?`)} ${whereStr}`;
+        params =  keys.map( key =>  data[key]).concat(params);
         break;
       case 'count':
         sql = `select count(*) as total from ${table} ${whereStr}`;
@@ -212,7 +241,7 @@ export class Base{
     return {
       sql,
       params
-    };
+    }
   }
 
 }

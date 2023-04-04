@@ -19,12 +19,14 @@
   "author": "Asd",
   "license": "MIT",
   "dependencies": {
-    "@gas0324/utils": "^1.0.0",
+    "@gas0324/util": "^1.0.0",
     "mysql2": "^3.2.0"
   },
   "devDependencies": {
-    "typescript": "^4.9.5",
-    "@types/node": "^18.15.5"
+    "@types/node": "^18.15.5",
+    "typescript": "^4.9.5"
   },
-  "files": ["dist/*"]
+  "files": [
+    "dist/*"
+  ]
 }

@@ -8,21 +8,22 @@ export interface MysqlConfig extends PoolOptions{
 export interface MysqlOpt{
   table: string;
   field: string;
-  where: string | WhereObjectOption | Array<WhereObjectOption | string>;
+  where: WhereOptions;
   order: string;
   data: AnyObject;
   limit: number;
   offset: number;
 }
 
-
-export interface WhereObjectOption extends AnyObject {
-  name?: string;
-  operator?: 'like' | 'in' | '=' | '<' | '<=' | '>' | '>='| '<>';
-  value?: any;
-  _mode?: 'base' | 'normal';
-}
-
 export interface AnyObject {
   [props:string]: any;
 }
+
+export interface WhereObjectOption extends AnyObject {
+  name?: string | string[];
+  operator?: string;
+  value?: any;
+  _mode?: string;
+}
+
+export type WhereOptions = string | WhereObjectOption | Array<WhereOptions>;

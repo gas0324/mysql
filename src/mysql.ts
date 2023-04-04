@@ -1,4 +1,4 @@
-import { unlineToHump } from '@gas0324/utils';
+import { unlineToHump } from '@gas0324/util';
 import { createPool, OkPacket, Pool, RowDataPacket } from 'mysql2/promise';
 import { Base } from './base';
 import { MysqlError } from './mysql-error';
@@ -56,8 +56,8 @@ export class Mysql extends Base{
     if(!keys.length){
       throw new MysqlError('插入的数据为空', '102');
     }
-    let {sql} = this.makeSql('insert');
-    const result = await this.execute(sql);
+    let {sql, params} = this.makeSql('insert');
+    const result = await this.execute(sql, params);
     return {
       insertId: (<OkPacket>result).insertId
     };
@@ -106,35 +106,28 @@ export class Mysql extends Base{
    * @param {string} sql    sql语句
    * @param {array} params =  参数
    */
-  query(sql: string, params: Array<any> = []) {
-
-    console.log(sql, params);
-
+  async query(sql: string, params: Array<any> = []) {
     const pool = this.getPool();
+    sql = this.filterSql(sql);
 
-    return new Promise<unknown[]> (async (resolve) => {
+    if(!sql) return [];
+    console.log(sql, params);
+    const [rows, fields] = await pool.query(sql, params);
+    const keys = fields.map(fiedlPacket => {
+      return {
+        name: fiedlPacket.name,
+        to: unlineToHump(fiedlPacket.name)
+      }
+    });
 
-      sql = this.filterSql(sql);
-      if(!sql) resolve([]);
-
-      const [rows, fields] = await pool.query(sql, params);
-      const keys = fields.map(fiedlPacket => {
-        return {
-          name: fiedlPacket.name,
-          to: unlineToHump(fiedlPacket.name)
-        }
-      });
-
-      const result = (<RowDataPacket[]>rows).map(item => {
+    const result = (<RowDataPacket[]>rows).map(item => {
         const obj: any = {};
         keys.forEach(({ to, name }) => {
           obj[to] = item[name];
         })
         return obj;
-      })
-
-      resolve(result);
-    })
+      });
+    return result
 
   }
 
@@ -144,9 +137,9 @@ export class Mysql extends Base{
    * @param {string} sql [description]
    */
   async execute(sql: string, params: Array<any> = []) {
-    console.log(sql, params);
     const pool = this.getPool();
     sql = this.filterSql(sql);
+    console.log(sql, params);
     // const [rows, field] = await pool.execute(sql, params);
     const [rows] = await pool.execute(sql, params);
     return rows
@@ -155,7 +148,7 @@ export class Mysql extends Base{
 
   /**
    * 事务
-   * @param {{sql: string, params?: any[]}[]}} params sql:SQL语句 params: 参数数组
+   * @param {{sql: string, params?: any[]}[]} params sql:SQL语句 params: 参数数组
    */
   async transaction(params: Array<{sql: string, params?: any[]}>){
     const conn = await this.getConnection();
@@ -166,13 +159,14 @@ export class Mysql extends Base{
       const queryPromises:unknown[] = [];
 
       params.forEach((query) => {
-        let { sql, params:sqlParams = []} = query;
+        let { sql, params:_params = []} = query;
+        console.log(sql, _params);
         sql = this.filterSql(sql);
-        queryPromises.push(conn.execute(sql, sqlParams));
+        queryPromises.push(conn.execute(sql, _params));
       })
       const results = await Promise.all(queryPromises);
       await conn.commit();
-      return results
+      return results.map(item => item[0])
     } catch (err) {
       await conn.rollback();
       return Promise.reject(err)
