@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "mysql生成器",
   "main": "dist/index",
+  "typings": "dist/index.d.ts",
+  "repository": "https://github.com/gas0324/mysql",
   "scripts": {
     "prebuild": "rmdir /Q /S dist",
     "build": "tsc",
@@ -20,6 +22,7 @@
   "license": "MIT",
   "dependencies": {
     "@gas0324/util": "^1.0.0",
+    "@log4js-node/log4js-api": "^1.0.2",
     "mysql2": "^3.2.0"
   },
   "devDependencies": {

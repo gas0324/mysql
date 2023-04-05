@@ -38,7 +38,7 @@ export class Base{
    * 查询字段
    * @param {string} field 查询字段
    */
-  field(field: string) {
+  field(field: string = '*') {
     this.opt.field = field;
     return this;
   }

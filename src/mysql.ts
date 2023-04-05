@@ -3,10 +3,9 @@ import { createPool, OkPacket, Pool, RowDataPacket } from 'mysql2/promise';
 import { Base } from './base';
 import { MysqlError } from './mysql-error';
 import { MysqlConfig } from './type';
+import { logger } from './logger';
 
 let pool: Pool, prefix: string;
-
-
 export class Mysql extends Base{
 
   constructor(table?: string){
@@ -111,7 +110,7 @@ export class Mysql extends Base{
     sql = this.filterSql(sql);
 
     if(!sql) return [];
-    console.log(sql, params);
+    logger.info(sql, params);
     const [rows, fields] = await pool.query(sql, params);
     const keys = fields.map(fiedlPacket => {
       return {
@@ -139,7 +138,7 @@ export class Mysql extends Base{
   async execute(sql: string, params: Array<any> = []) {
     const pool = this.getPool();
     sql = this.filterSql(sql);
-    console.log(sql, params);
+    logger.info(sql, params);
     // const [rows, field] = await pool.execute(sql, params);
     const [rows] = await pool.execute(sql, params);
     return rows
@@ -160,7 +159,7 @@ export class Mysql extends Base{
 
       params.forEach((query) => {
         let { sql, params:_params = []} = query;
-        console.log(sql, _params);
+        logger.info(sql, _params);
         sql = this.filterSql(sql);
         queryPromises.push(conn.execute(sql, _params));
       })

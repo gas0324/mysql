@@ -1,3 +1,5 @@
+import { logger } from './logger';
+
 export class MysqlError extends Error {
 
   protected code: string;
@@ -10,6 +12,7 @@ export class MysqlError extends Error {
   constructor(message: string, code?: string){
     super(message);
     this.code = code;
+    logger.warn(message, code);
   }
 
 
