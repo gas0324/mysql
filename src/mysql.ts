@@ -1,7 +1,6 @@
 import { unlineToHump } from '@gas0324/util';
 import { createPool, OkPacket, Pool, RowDataPacket } from 'mysql2/promise';
 import { Base } from './base';
-import { MysqlError } from './mysql-error';
 import { MysqlConfig } from './type';
 import { logger } from './logger';
 
@@ -18,12 +17,8 @@ export class Mysql extends Base{
    */
   async find() {
     this.limit(1);
-    const { where } = this.opt;
     const data = await this.select();
-    if(!data.length)
-      throw new MysqlError(`查询的内容不存在, where: ${JSON.stringify(where)}`, '101');
-
-    return data[0];
+    return data.length ? data[0] : null
   }
 
 
@@ -33,7 +28,7 @@ export class Mysql extends Base{
   async count() {
     let {sql, params} = this.makeSql('count');
     const data = await this.query(sql, params);
-    return data.length ? (data[0] as any).total : 0;
+    return data.length ? (data[0] as any).total : 0
   }
 
 
@@ -42,7 +37,7 @@ export class Mysql extends Base{
    */
   async select() {
     let {sql, params} = this.makeSql();
-    return this.query(sql, params);
+    return this.query(sql, params)
   }
 
 
@@ -50,16 +45,8 @@ export class Mysql extends Base{
    * 插入
    */
   async insert() {
-    const { data } = this.opt;
-    let keys = Object.keys(data!);
-    if(!keys.length){
-      throw new MysqlError('插入的数据为空', '102');
-    }
     let {sql, params} = this.makeSql('insert');
-    const result = await this.execute(sql, params);
-    return {
-      insertId: (<OkPacket>result).insertId
-    };
+    return this.execute(sql, params) as Promise<OkPacket>
   }
 
 
@@ -67,20 +54,8 @@ export class Mysql extends Base{
    * 更新
    */
   async update(){
-    const { data, where } = this.opt;
-    let keys = Object.keys(data);
-    if(!keys.length){
-      throw new MysqlError('更新的数据为空', '103');
-    }
     let {sql, params} = this.makeSql('update');
-    const result = await this.execute(sql, params) as OkPacket;
-    if(result.affectedRows == 0)
-      throw new MysqlError(`更新的内容不存在, where: ${JSON.stringify(where)}`, '104');
-
-    return {
-      rows: result.affectedRows
-    };
-
+    return this.execute(sql, params) as Promise<OkPacket>
   }
 
 
@@ -88,15 +63,8 @@ export class Mysql extends Base{
    * 删除
    */
   async delete(){
-    const { where } = this.opt;
     let {sql, params} = this.makeSql('delete');
-    const result = await this.execute(sql, params) as OkPacket;
-    if(result.affectedRows == 0)
-      throw new MysqlError(`删除的内容不存在, where: ${JSON.stringify(where)}`, '105');
-
-    return {
-      rows: result.affectedRows
-    };
+    return this.execute(sql, params) as Promise<OkPacket>
   }
 
 
@@ -139,15 +107,14 @@ export class Mysql extends Base{
     const pool = this.getPool();
     sql = this.filterSql(sql);
     logger.info(sql, params);
-    // const [rows, field] = await pool.execute(sql, params);
-    const [rows] = await pool.execute(sql, params);
-    return rows
+    const [result] = await pool.execute(sql, params);
+    return result
   }
 
 
   /**
    * 事务
-   * @param {{sql: string, params?: any[]}[]} params sql:SQL语句 params: 参数数组
+   * @param {Array<{sql: string, params?: any[]}>} params sql:SQL语句 params: 参数数组
    */
   async transaction(params: Array<{sql: string, params?: any[]}>){
     const conn = await this.getConnection();
@@ -159,8 +126,8 @@ export class Mysql extends Base{
 
       params.forEach((query) => {
         let { sql, params:_params = []} = query;
-        logger.info(sql, _params);
         sql = this.filterSql(sql);
+        logger.info(sql, _params);
         queryPromises.push(conn.execute(sql, _params));
       })
       const results = await Promise.all(queryPromises);
@@ -192,7 +159,7 @@ export class Mysql extends Base{
     if(pool){
       return pool;
     }else{
-      throw new MysqlError('未初始化连接', '100')
+      throw new Error('未初始化连接');
     }
   }
 
