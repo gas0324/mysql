@@ -1,6 +1,16 @@
 import { MysqlOpt, WhereObjectOption, AnyObject, WhereOptions } from "./type";
 import { typeOf, humpToUnline, isEmpty } from '@gas0324/util';
 
+function fieldHumpToUnline(field: string): string{
+  if(field.indexOf('.') >-1 ){
+    const arr = field.split('.');
+    arr[1] = humpToUnline(arr[1]);
+    return arr.join('.');
+  }else{
+    return humpToUnline(field);
+  }
+}
+
 export class Base{
 
   protected opt: Partial<MysqlOpt> = {
@@ -119,7 +129,7 @@ export class Base{
               if(isEmpty(otherWhere[key])){
                 return;
               }
-              andArr.push(`${humpToUnline(key)} = ?`);
+              andArr.push(`${fieldHumpToUnline(key)} = ?`);
               params.push(otherWhere[key]);
             });
           }else{
@@ -159,7 +169,7 @@ export class Base{
     })(where);
 
     function _getNormalWhere({name, value, operator}: {name: string, value: any, operator: string}){
-      name = humpToUnline(name);
+      name = fieldHumpToUnline(name);
       let where: string, params: any[];
       switch (operator) {
         case 'like':
@@ -210,7 +220,7 @@ export class Base{
       case 'insert':
         keys = Object.keys(data);
         let values = keys.map(key => data[key]);
-        sql = `insert into ${table} (${keys.map(key => `\`${humpToUnline(key)}\``).join(',')}) values (${keys.map(_ => '?').join()})`;
+        sql = `insert into ${table} (${keys.map(key => `\`${fieldHumpToUnline(key)}\``).join(',')}) values (${keys.map(_ => '?').join()})`;
         params = params.concat(values);
         break;
       case 'delete':
@@ -218,7 +228,7 @@ export class Base{
         break;
       case 'update':
         keys = Object.keys(data);
-        sql = `update ${table} set ${keys.map(key => `\`${humpToUnline(key)}\` = ?`)} ${whereStr}`;
+        sql = `update ${table} set ${keys.map(key => `\`${fieldHumpToUnline(key)}\` = ?`)} ${whereStr}`;
         params =  keys.map( key =>  data[key]).concat(params);
         break;
       case 'count':
